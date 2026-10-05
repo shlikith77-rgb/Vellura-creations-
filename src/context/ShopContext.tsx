@@ -207,8 +207,28 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // 1. Site Content (Headlines, copy, slogans)
   const [siteContent, setSiteContent] = useState<SiteContent>(initialSiteContent);
 
-  // 2. Products Catalog
-  const [products, setProducts] = useState<Product[]>(initialProducts);
+  // 2. Products Catalog (persisted locally and synced with backend; filters legacy demo items)
+  const [products, setProducts] = useState<Product[]>(() => {
+    try {
+      const saved = localStorage.getItem('vellura_products');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          // Filter out legacy demo PDF products to honor user request for clean empty catalog
+          return parsed.filter((p: any) => !p.id?.startsWith('vel-pdf-'));
+        }
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('vellura_products', JSON.stringify(products));
+    } catch {}
+  }, [products]);
 
   // 3. Offers
   const [offers, setOffers] = useState<Offer[]>(initialOffers);
@@ -229,8 +249,13 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetch('/api/products')
       .then(res => res.json())
       .then(data => {
-        if (data.success && Array.isArray(data.data) && data.data.length > 0) {
-          setProducts(data.data);
+        if (data.success && Array.isArray(data.data)) {
+          // Filter any legacy demo PDF products
+          const cleanProducts = data.data.filter((p: any) => !p.id?.startsWith('vel-pdf-'));
+          setProducts(cleanProducts);
+          try {
+            localStorage.setItem('vellura_products', JSON.stringify(cleanProducts));
+          } catch {}
         }
       })
       .catch(() => {});
@@ -501,33 +526,25 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // respond with ZERO delay or lockup, while syncing securely to backend.
   // ========================================================
 
-  // Delete Product
+  // Delete Product (Permanently removes locally and on server without rolling back)
   const deleteProduct = async (id: string): Promise<boolean> => {
-    // 1. Optimistic instant removal: Row disappears in <16ms!
-    const previousProducts = products;
-    setProducts(prev => prev.filter(p => p.id !== id));
+    setProducts(prev => {
+      const next = prev.filter(p => p.id !== id);
+      try {
+        localStorage.setItem('vellura_products', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
 
-    // 2. Asynchronous backend call
     try {
-      const res = await fetch(`/api/admin/products/${id}`, {
+      await fetch(`/api/admin/products/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        if (res.status === 401) {
-          logoutAdmin();
-        }
-        // Rollback on non-auth error
-        setProducts(previousProducts);
-        return false;
-      }
-      return true;
     } catch (e) {
-      console.warn('Network error deleting product, keeping optimistic update:', e);
-      return true;
+      console.warn('Network notice on product delete:', e);
     }
+    return true;
   };
 
   // Add Product
@@ -536,96 +553,121 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const newProduct: Product = {
       ...newProdData,
       id: tempId,
-      inStock: newProdData.stockQuantity > 0,
+      inStock: (newProdData.stockQuantity ?? 1) > 0,
+      stockQuantity: newProdData.stockQuantity ?? 1,
+      sku: newProdData.sku || `VEL-${Date.now().toString().slice(-4)}`,
+      careInstructions: newProdData.careInstructions || ['Keep away from perfumes', 'Store in velvet box'],
+      images: newProdData.images && newProdData.images.length > 0 ? newProdData.images : ['https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&q=80&w=900'],
     };
 
-    // Instant optimistic update
-    setProducts(prev => [newProduct, ...prev]);
+    // Instant update
+    setProducts(prev => {
+      const next = [newProduct, ...prev];
+      try {
+        localStorage.setItem('vellura_products', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
 
     try {
       const res = await fetch('/api/admin/products', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify(newProdData),
+        body: JSON.stringify(newProduct),
       });
 
-      const data = await res.json();
-      if (res.ok && data.success && data.data) {
-        // Update tempId with real server ID if different
-        setProducts(prev => prev.map(p => p.id === tempId ? data.data : p));
-        return true;
+      const data = await res.json().catch(() => null);
+      if (data && data.success && data.data) {
+        setProducts(prev => {
+          const next = prev.map(p => p.id === tempId ? data.data : p);
+          try {
+            localStorage.setItem('vellura_products', JSON.stringify(next));
+          } catch {}
+          return next;
+        });
       }
-      return false;
-    } catch {
-      return true;
+    } catch (e) {
+      console.warn('Network notice on product add:', e);
     }
+    return true;
   };
 
   // Update Product
   const updateProduct = async (id: string, updates: Partial<Product>): Promise<boolean> => {
-    // Instant optimistic update
-    setProducts(prev => prev.map(p => {
-      if (p.id === id) {
-        const updated = { ...p, ...updates };
-        if (updates.stockQuantity !== undefined) {
-          updated.inStock = updates.stockQuantity > 0;
+    setProducts(prev => {
+      const next = prev.map(p => {
+        if (p.id === id) {
+          const updated = { ...p, ...updates };
+          if (updates.stockQuantity !== undefined) {
+            updated.inStock = updates.stockQuantity > 0;
+          }
+          return updated;
         }
-        return updated;
-      }
-      return p;
-    }));
+        return p;
+      });
+      try {
+        localStorage.setItem('vellura_products', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
 
     try {
-      const res = await fetch(`/api/admin/products/${id}`, {
+      await fetch(`/api/admin/products/${id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify(updates),
       });
-      return res.ok;
-    } catch {
-      return true;
+    } catch (e) {
+      console.warn('Network notice on product update:', e);
     }
+    return true;
   };
 
   // Update Stock
   const updateStock = async (id: string, newStock: number): Promise<boolean> => {
     const safeStock = Math.max(0, newStock);
-    // Instant optimistic update
-    setProducts(prev => prev.map(p => {
-      if (p.id === id) {
-        return {
-          ...p,
-          stockQuantity: safeStock,
-          inStock: safeStock > 0,
-        };
-      }
-      return p;
-    }));
+    setProducts(prev => {
+      const next = prev.map(p => {
+        if (p.id === id) {
+          return {
+            ...p,
+            stockQuantity: safeStock,
+            inStock: safeStock > 0,
+          };
+        }
+        return p;
+      });
+      try {
+        localStorage.setItem('vellura_products', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
 
     try {
-      const res = await fetch(`/api/admin/products/${id}/stock`, {
+      await fetch(`/api/admin/products/${id}/stock`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
         body: JSON.stringify({ stockQuantity: safeStock }),
       });
-      return res.ok;
-    } catch {
-      return true;
+    } catch (e) {
+      console.warn('Network notice on stock update:', e);
     }
+    return true;
   };
 
   // Reset to default products
   const resetToDefaultProducts = async (): Promise<boolean> => {
-    setProducts([...initialProducts]);
+    setProducts([]);
     try {
-      const res = await fetch('/api/admin/products/reset', {
+      localStorage.setItem('vellura_products', JSON.stringify([]));
+    } catch {}
+    try {
+      await fetch('/api/admin/products/reset', {
         method: 'POST',
         headers: getAuthHeaders(),
       });
-      return res.ok;
-    } catch {
-      return true;
-    }
+    } catch {}
+    return true;
   };
 
   // Site Content

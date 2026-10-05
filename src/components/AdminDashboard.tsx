@@ -990,6 +990,38 @@ export const AdminDashboard: React.FC = () => {
                       </table>
                     </div>
 
+                    {products.length === 0 && (
+                      <div className="text-center py-16 px-4 bg-[#141418] border border-[#2E2E36] my-4 shadow-inner">
+                        <Package className="w-10 h-10 text-[#D4AF37] mx-auto mb-3 opacity-60" />
+                        <h4 className="font-serif text-lg text-[#FAF8F5] mb-1">Catalog Is Currently Empty</h4>
+                        <p className="text-xs text-[#8E8B85] mb-5 max-w-md mx-auto">
+                          All jewellery and candle products have been cleared. You can now add your new showroom pieces with custom photos, titles, prices, and descriptions.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddingProduct(true);
+                            setEditingProduct(null);
+                            setProductForm({
+                              name: '',
+                              category: 'jewellery',
+                              subcategory: 'necklaces',
+                              price: 2500,
+                              originalPrice: 3200,
+                              weight: '110 g',
+                              stockQuantity: 10,
+                              images: [],
+                              sku: `VEL-${Date.now().toString().slice(-4)}`,
+                            });
+                          }}
+                          className="px-5 py-2.5 bg-[#D4AF37] hover:bg-[#E6CA65] text-[#121214] text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 shadow-lg"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Add Your First Product</span>
+                        </button>
+                      </div>
+                    )}
+
                   </div>
                 )}
 

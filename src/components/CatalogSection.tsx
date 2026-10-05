@@ -150,19 +150,28 @@ export const CatalogSection: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className="text-center py-16 bg-white border border-[#EAE6DF] p-8">
-            <p className="font-serif text-xl text-[#1A1A1A] mb-2">No creations matched your selection</p>
-            <p className="text-xs text-[#706E6B] mb-4">Try clearing your search query or selecting another category.</p>
-            <button
-              onClick={() => {
-                setSelectedCategory('all');
-                setSelectedSubcategory('all');
-                setSearchQuery('');
-              }}
-              className="px-5 py-2 bg-[#121214] text-[#FAF8F5] text-xs uppercase tracking-wider font-semibold"
-            >
-              View All Showroom Pieces
-            </button>
+          <div className="text-center py-16 bg-white border border-[#EAE6DF] p-8 max-w-xl mx-auto shadow-xs">
+            <div className="w-12 h-12 mx-auto rounded-full bg-[#FAF8F5] border border-[#D4AF37]/40 flex items-center justify-center text-[#D4AF37] mb-3">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <p className="font-serif text-xl sm:text-2xl text-[#1A1A1A] mb-2">Showroom Collection In Update</p>
+            <p className="text-xs text-[#706E6B] mb-5 leading-relaxed">
+              New handcrafted artificial jewellery designs and festive pieces are currently being added. WhatsApp our showroom directly for custom designs, current in-stock bridal suites, and special orders.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {(searchQuery || selectedCategory !== 'all' || selectedSubcategory !== 'all') ? (
+                <button
+                  onClick={() => {
+                    setSelectedCategory('all');
+                    setSelectedSubcategory('all');
+                    setSearchQuery('');
+                  }}
+                  className="px-5 py-2.5 bg-[#121214] text-[#FAF8F5] text-xs uppercase tracking-wider font-semibold"
+                >
+                  View All Pieces
+                </button>
+              ) : null}
+            </div>
           </div>
         )}
 

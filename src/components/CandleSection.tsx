@@ -69,11 +69,21 @@ export const CandleSection: React.FC = () => {
         </div>
 
         {/* Candle Product Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-6">
-          {candleProducts.slice(0, 4).map(product => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        {candleProducts.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-6">
+            {candleProducts.slice(0, 4).map(product => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12 px-6 border border-[#2E2E36] bg-[#18181C] max-w-lg mx-auto shadow-md">
+            <Flame className="w-8 h-8 text-[#D4AF37] mx-auto mb-3 opacity-75" />
+            <p className="font-serif text-lg text-[#FAF8F5] mb-1.5">Artisanal Candle Batches In Production</p>
+            <p className="text-xs text-[#8E8B85] leading-relaxed">
+              New hand-poured soy and floating diya collections are being freshly poured. WhatsApp our showroom directly for seasonal hampers and custom festive bulk gifting.
+            </p>
+          </div>
+        )}
 
       </div>
     </section>

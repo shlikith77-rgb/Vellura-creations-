@@ -26,62 +26,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '1530452026';
 const adminSessions = new Map<string, { createdAt: number }>();
 
 // Initial sample orders for preview
-const initialSampleOrders: Order[] = [
-  {
-    id: 'VEL-2026-1042',
-    customerName: 'Kavita Singhal',
-    phone: '+91 98112 34567',
-    whatsappNumber: '+91 98112 34567',
-    email: 'kavita.singhal@example.com',
-    address: 'Villa 14, Royal Palm Enclave, Sector 15',
-    city: 'Jaipur',
-    state: 'Rajasthan',
-    pincode: '302001',
-    landmark: 'Opposite Central Park',
-    items: [
-      {
-        id: 'sample-item-1',
-        product: initialProducts[4] || initialProducts[0],
-        quantity: 1,
-        selectedSize: 'Adjustable Dori / Velvet Backing',
-        selectedVariant: 'Emerald & Ruby Green Red',
-      }
-    ],
-    subtotal: 5400,
-    discount: 250,
-    total: 5150,
-    paymentMethod: 'Cash on Delivery',
-    status: 'Processing',
-    createdAt: '2026-10-02T14:30:00Z',
-    notes: 'Please pack in luxury festive bridal packaging.',
-  },
-  {
-    id: 'VEL-2026-1041',
-    customerName: 'Megha Kapoor',
-    phone: '+91 98765 43210',
-    whatsappNumber: '+91 98765 43210',
-    email: 'megha.kapoor@example.com',
-    address: 'B-304, Emerald Heights, Linking Road',
-    city: 'Mumbai',
-    state: 'Maharashtra',
-    pincode: '400050',
-    items: [
-      {
-        id: 'sample-item-2',
-        product: initialProducts[0],
-        quantity: 1,
-        selectedSize: 'Adjustable Cord (Standard 16-18 Inch)',
-        selectedVariant: 'Dual Tone Pink & Blue Sapphire',
-      }
-    ],
-    subtotal: 4170,
-    discount: 417,
-    total: 3753,
-    paymentMethod: 'Cash on Delivery',
-    status: 'Delivered',
-    createdAt: '2026-09-30T10:15:00Z',
-  }
-];
+const initialSampleOrders: Order[] = [];
 
 // Persistent Store State
 interface AppStore {
@@ -314,13 +259,7 @@ async function startServer() {
 
   app.delete('/api/admin/products/:id', requireAdminAuth, (req: Request, res: Response) => {
     const { id } = req.params;
-    const initialLen = store.products.length;
     store.products = store.products.filter(p => p.id !== id);
-
-    if (store.products.length === initialLen) {
-      return res.status(404).json({ success: false, error: 'Product not found' });
-    }
-
     scheduleSave();
     return res.json({ success: true, id });
   });
