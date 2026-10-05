@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, ShoppingBag, Zap, MessageCircle, Eye } from 'lucide-react';
+import { Heart, ShoppingBag, Zap, MessageCircle } from 'lucide-react';
 import { Product } from '../types';
 import { useShop } from '../context/ShopContext';
 import { JewelleryImage } from './JewelleryImage';
@@ -33,118 +33,121 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
   const handleWhatsAppEnquiry = (e: React.MouseEvent) => {
     e.stopPropagation();
-    window.open(getWhatsAppProductEnquiryUrl(product), '_blank');
+    const url = getWhatsAppProductEnquiryUrl(product);
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   return (
     <div 
       onClick={() => setSelectedProduct(product)}
-      className="group flex flex-col bg-white border border-[#EAE6DF] hover:border-[#D4AF37]/50 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer overflow-hidden"
+      className="group flex flex-col bg-white border border-[#EAE6DF] hover:border-[#D4AF37]/60 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer overflow-hidden rounded-xs"
     >
-      {/* Product Image Stage (65-75% visual prominence) */}
-      <div className="relative aspect-[4/5] w-full bg-[#18181C] overflow-hidden">
+      {/* 1:1 Square Product Image Container */}
+      <div className="relative aspect-square w-full bg-[#18181C] overflow-hidden flex-shrink-0">
         <JewelleryImage product={product} />
 
-        {/* Wishlist Button */}
+        {/* Wishlist Button (Clean, Non-overlapping) */}
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             toggleWishlist(product.id);
           }}
-          className={`absolute top-3 right-3 z-10 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+          className={`absolute top-2 right-2 z-10 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors shadow-sm ${
             isFavorited 
-              ? 'bg-[#6B1D2F] text-white shadow-md' 
-              : 'bg-black/40 backdrop-blur-sm text-white hover:text-[#D4AF37]'
+              ? 'bg-[#6B1D2F] text-white' 
+              : 'bg-black/45 backdrop-blur-xs text-white hover:text-[#D4AF37] hover:bg-black/70'
           }`}
           title={isFavorited ? 'Remove from wishlist' : 'Save to wishlist'}
           aria-label="Wishlist toggle"
         >
-          <Heart className={`w-4 h-4 ${isFavorited ? 'fill-current' : ''}`} />
+          <Heart className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isFavorited ? 'fill-current' : ''}`} />
         </button>
-
-        {/* Quick View Hover Pill */}
-        <div className="absolute inset-x-0 bottom-3 px-3 hidden group-hover:flex items-center justify-center transition-opacity duration-200">
-          <span className="py-1.5 px-4 bg-[#121214]/90 backdrop-blur-sm border border-[#D4AF37]/50 text-white text-[11px] uppercase tracking-wider font-medium flex items-center gap-1.5 shadow-lg">
-            <Eye className="w-3.5 h-3.5 text-[#D4AF37]" />
-            View Details
-          </span>
-        </div>
       </div>
 
       {/* Product Content Details */}
-      <div className="p-4 sm:p-5 flex flex-col flex-grow justify-between bg-white">
+      <div className="p-2.5 sm:p-3.5 flex flex-col flex-grow justify-between bg-white">
         <div>
-          {/* Metadata: Category & Weight */}
-          <div className="flex items-center justify-between text-xs text-[#706E6B] mb-1.5">
-            <span className="uppercase tracking-[0.15em] text-[10px] text-[#C5A059] font-medium">
+          {/* Metadata Row: Category & Weight */}
+          <div className="flex items-center justify-between text-[10px] sm:text-xs text-[#8E8B85] mb-1 font-sans">
+            <span className="uppercase tracking-wider text-[#C5A059] font-medium truncate max-w-[65%]">
               {product.subcategory.replace('_', ' ')}
             </span>
-            <span className="font-mono tabular-nums text-[11px] text-[#706E6B]">
-              Weight: {product.weight}
+            <span className="font-mono text-[#706E6B] flex-shrink-0">
+              {product.weight}
             </span>
           </div>
 
-          {/* Product Name */}
-          <h3 className="font-serif text-base sm:text-lg font-normal text-[#1A1A1A] line-clamp-1 group-hover:text-[#6B1D2F] transition-colors">
+          {/* Product Name (Clear, normal readable font, 2 lines max with aligned height) */}
+          <h3 className="font-sans text-xs sm:text-sm font-medium text-[#1A1A1A] line-clamp-2 leading-snug group-hover:text-[#6B1D2F] transition-colors min-h-[2rem] sm:min-h-[2.5rem]">
             {product.name}
           </h3>
-
-          {/* Short Description */}
-          <p className="text-xs text-[#706E6B] font-light line-clamp-2 mt-1 mb-3 leading-relaxed">
-            {product.description}
-          </p>
         </div>
 
         <div>
           {/* Pricing & Stock Status */}
-          <div className="pt-2 border-t border-[#F2EFE9] flex items-baseline justify-between mb-3">
-            <div className="flex items-baseline gap-2">
-              <span className="font-serif text-lg sm:text-xl font-semibold text-[#1A1A1A] tabular-nums">
+          <div className="mt-1.5 pt-1.5 border-t border-[#F2EFE9] flex items-baseline justify-between gap-1">
+            <div className="flex items-baseline gap-1.5 sm:gap-2 flex-wrap">
+              <span className="font-sans text-sm sm:text-base font-bold text-[#1A1A1A] tabular-nums">
                 ₹{product.price.toLocaleString('en-IN')}
               </span>
               {product.originalPrice > product.price && (
-                <span className="text-xs text-[#8E8B85] line-through tabular-nums">
+                <span className="font-sans text-[11px] sm:text-xs text-[#8E8B85] line-through tabular-nums">
                   ₹{product.originalPrice.toLocaleString('en-IN')}
                 </span>
               )}
             </div>
 
-            <span className={`text-[10px] uppercase tracking-wider font-semibold ${
-              product.inStock ? 'text-emerald-700' : 'text-red-700'
-            }`}>
-              {product.inStock ? 'In Stock' : 'Out of Stock'}
-            </span>
+            {product.discountPercentage > 0 ? (
+              <span className="text-[10px] sm:text-xs font-semibold text-[#6B1D2F] tabular-nums whitespace-nowrap">
+                {product.discountPercentage}% OFF
+              </span>
+            ) : (
+              <span className={`text-[10px] font-semibold whitespace-nowrap ${
+                product.inStock ? 'text-emerald-700' : 'text-red-700'
+              }`}>
+                {product.inStock ? 'In Stock' : 'Out of Stock'}
+              </span>
+            )}
           </div>
 
-          {/* Primary Action Buttons */}
-          <div className="grid grid-cols-2 gap-2 mb-2">
+          {/* Action Buttons: Clean, normal readable text and easy-to-tap touch targets */}
+          <div className="mt-2 space-y-1.5">
+            {/* Primary Add to Bag Button */}
             <button
+              type="button"
               onClick={handleQuickAdd}
               disabled={!product.inStock}
-              className="py-2.5 px-2 bg-[#121214] text-[#FAF8F5] hover:bg-[#2A2A30] disabled:bg-[#CCCCCC] disabled:cursor-not-allowed text-[11px] uppercase tracking-wider font-medium flex items-center justify-center gap-1.5 transition-colors"
+              className="w-full py-2 px-2 bg-[#121214] text-[#FAF8F5] hover:bg-[#2A2A30] active:scale-[0.98] disabled:bg-[#CCCCCC] disabled:cursor-not-allowed text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs"
             >
               <ShoppingBag className="w-3.5 h-3.5 text-[#D4AF37]" />
-              <span className="truncate">Add to Cart</span>
+              <span className="truncate">{product.inStock ? 'Add to Bag' : 'Out of Stock'}</span>
             </button>
 
-            <button
-              onClick={handleBuyNow}
-              disabled={!product.inStock}
-              className="py-2.5 px-2 bg-[#6B1D2F] text-white hover:bg-[#801B31] disabled:bg-[#CCCCCC] disabled:cursor-not-allowed text-[11px] uppercase tracking-wider font-semibold flex items-center justify-center gap-1 transition-colors"
-            >
-              <Zap className="w-3.5 h-3.5" />
-              <span>Buy Now</span>
-            </button>
+            {/* Quick Actions Row: Buy Now & WhatsApp */}
+            <div className="grid grid-cols-2 gap-1 text-[11px]">
+              <button
+                type="button"
+                onClick={handleBuyNow}
+                disabled={!product.inStock}
+                className="py-1 px-1 bg-[#6B1D2F]/10 hover:bg-[#6B1D2F] text-[#6B1D2F] hover:text-white border border-[#6B1D2F]/30 disabled:opacity-40 text-center font-medium flex items-center justify-center gap-1 transition-colors"
+                title="Direct Checkout"
+              >
+                <Zap className="w-3 h-3" />
+                <span className="truncate">Buy Now</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleWhatsAppEnquiry}
+                className="py-1 px-1 bg-[#25D366]/10 hover:bg-[#25D366] text-[#128C7E] hover:text-white border border-[#25D366]/30 text-center font-medium flex items-center justify-center gap-1 transition-colors"
+                title="Enquire on WhatsApp"
+              >
+                <MessageCircle className="w-3 h-3 text-[#25D366] group-hover:text-white" />
+                <span className="truncate">WhatsApp</span>
+              </button>
+            </div>
           </div>
-
-          {/* WhatsApp Direct Enquiry Button */}
-          <button
-            onClick={handleWhatsAppEnquiry}
-            className="w-full py-1.5 px-2 border border-[#25D366]/40 hover:bg-[#25D366]/10 text-[#128C7E] text-[11px] font-medium flex items-center justify-center gap-1.5 transition-colors"
-          >
-            <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
-            <span>Enquire on WhatsApp</span>
-          </button>
         </div>
 
       </div>

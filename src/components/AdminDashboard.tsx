@@ -26,7 +26,8 @@ import {
   Image as ImageIcon,
   LogOut,
   Eye,
-  CheckCircle2
+  CheckCircle2,
+  Loader2
 } from 'lucide-react';
 import { useShop } from '../context/ShopContext';
 import { Product, OrderStatus, ProductCategory, ProductSubcategory, SiteContent } from '../types';
@@ -59,12 +60,29 @@ export const AdminDashboard: React.FC = () => {
     deleteReview
   } = useShop();
 
-  // Authentication State (Password is 153045)
+  // Authentication State
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'texts' | 'orders' | 'inventory' | 'offers' | 'business'>('dashboard');
+
+  // Inline non-blocking confirmation states (eliminates all window.confirm freezing)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState<string | null>(null);
+  const [confirmResetText, setConfirmResetText] = useState(false);
+  const [confirmResetCatalog, setConfirmResetCatalog] = useState(false);
+
+  // Transient notification toasts
+  const [actionNotification, setActionNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
+    setActionNotification({ message, type });
+    setTimeout(() => {
+      setActionNotification(null);
+    }, 2800);
+  };
 
   // Text Editing State
   const [textForm, setTextForm] = useState<SiteContent>(siteContent);
@@ -103,28 +121,42 @@ export const AdminDashboard: React.FC = () => {
 
   if (!isAdminOpen) return null;
 
-  // Handle Login with 6-digit password: 153045
-  const handlePinSubmit = (e: React.FormEvent) => {
+  // Handle Login via backend validation (Strict: zero password hints or leaks)
+  const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loginAdmin(pinInput)) {
+    if (!pinInput.trim() || isLoggingIn) return;
+
+    setIsLoggingIn(true);
+    setPinError('');
+    const result = await loginAdmin(pinInput);
+    setIsLoggingIn(false);
+
+    if (result.success) {
       setPinError('');
       setPinInput('');
     } else {
-      setPinError('Invalid 6-digit password. Hint: 153045');
+      setPinError('Incorrect password. Please try again.');
+      setPinInput('');
     }
   };
 
-  const handleDigitClick = (digit: string) => {
-    if (pinInput.length < 6) {
-      const nextPin = pinInput + digit;
-      setPinInput(nextPin);
-      if (nextPin.length === 6) {
-        if (loginAdmin(nextPin)) {
-          setPinError('');
-          setPinInput('');
-        } else {
-          setPinError('Invalid 6-digit password. Hint: 153045');
-        }
+  const handleDigitClick = async (digit: string) => {
+    if (isLoggingIn || pinInput.length >= 6) return;
+    const nextPin = pinInput + digit;
+    setPinInput(nextPin);
+    setPinError('');
+
+    if (nextPin.length === 6) {
+      setIsLoggingIn(true);
+      const result = await loginAdmin(nextPin);
+      setIsLoggingIn(false);
+
+      if (result.success) {
+        setPinError('');
+        setPinInput('');
+      } else {
+        setPinError('Incorrect password. Please try again.');
+        setPinInput('');
       }
     }
   };
@@ -171,18 +203,19 @@ export const AdminDashboard: React.FC = () => {
     }));
   };
 
-  const handleSaveProduct = (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!productForm.name || !productForm.price) return;
 
     if (editingProduct) {
-      updateProduct(editingProduct.id, {
+      await updateProduct(editingProduct.id, {
         ...productForm,
         inStock: (productForm.stockQuantity || 0) > 0,
       });
+      showNotification(`"${productForm.name}" updated successfully`);
       setEditingProduct(null);
     } else {
-      addProduct({
+      await addProduct({
         name: productForm.name || 'New Vellura Creation',
         category: (productForm.category as ProductCategory) || 'jewellery',
         subcategory: (productForm.subcategory as ProductSubcategory) || 'necklaces',
@@ -206,6 +239,7 @@ export const AdminDashboard: React.FC = () => {
         images: productForm.images && productForm.images.length > 0 ? productForm.images : ['/src/assets/images/showcase_bridal_emerald_1791132536998.jpg'],
         sku: productForm.sku || `VEL-PROD-${Date.now().toString().slice(-4)}`,
       });
+      showNotification(`"${productForm.name}" added to catalog`);
       setIsAddingProduct(false);
     }
 
@@ -214,17 +248,12 @@ export const AdminDashboard: React.FC = () => {
   };
 
   // Save Website Texts
-  const handleSaveSiteTexts = (e: React.FormEvent) => {
+  const handleSaveSiteTexts = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateSiteContent(textForm);
+    await updateSiteContent(textForm);
     setTextSaveSuccess(true);
+    showNotification('All website texts and slogans saved successfully');
     setTimeout(() => setTextSaveSuccess(false), 3000);
-  };
-
-  const openCustomerWhatsApp = (order: any) => {
-    const rawPhone = (order.whatsappNumber || order.phone).replace(/[^0-9]/g, '');
-    const msg = `Hello ${order.customerName}, this is Vellura Creations regarding your Order #${order.id} for ₹${order.total.toLocaleString('en-IN')}.`;
-    window.open(`https://wa.me/${rawPhone}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
   return (
@@ -233,9 +262,16 @@ export const AdminDashboard: React.FC = () => {
         className="relative bg-[#1A1A1E] text-[#FAF8F5] w-full max-w-6xl max-h-[96vh] overflow-hidden border border-[#D4AF37]/40 shadow-2xl flex flex-col my-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        
+        {/* Floating Action Toast */}
+        {actionNotification && (
+          <div className="absolute top-4 right-4 z-50 bg-[#121214] border border-[#D4AF37] text-[#FAF8F5] px-4 py-2.5 shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 text-xs">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            <span>{actionNotification.message}</span>
+          </div>
+        )}
+
         {/* ========================================================= */}
-        {/* 1. LOGIN GATE: 6-DIGIT PASSWORD (153045) REQUIRED */}
+        {/* 1. SECURE LOGIN GATE (No Password Hints / No Leaks) */}
         {/* ========================================================= */}
         {!isAdminAuthenticated ? (
           <div className="p-8 sm:p-12 flex flex-col items-center justify-center text-center max-w-md mx-auto my-auto w-full">
@@ -254,7 +290,7 @@ export const AdminDashboard: React.FC = () => {
             </p>
 
             <form onSubmit={handlePinSubmit} className="w-full space-y-4">
-              {/* PIN Display */}
+              {/* PIN Circles Display */}
               <div className="flex justify-center gap-2 mb-2">
                 {[0, 1, 2, 3, 4, 5].map((index) => {
                   const digit = pinInput[index];
@@ -278,16 +314,21 @@ export const AdminDashboard: React.FC = () => {
                 type="password"
                 maxLength={6}
                 value={pinInput}
-                onChange={(e) => {
+                disabled={isLoggingIn}
+                onChange={async (e) => {
                   const val = e.target.value.replace(/[^0-9]/g, '');
                   setPinInput(val);
                   setPinError('');
-                  if (val.length === 6) {
-                    if (loginAdmin(val)) {
+                  if (val.length === 6 && !isLoggingIn) {
+                    setIsLoggingIn(true);
+                    const res = await loginAdmin(val);
+                    setIsLoggingIn(false);
+                    if (res.success) {
                       setPinError('');
                       setPinInput('');
                     } else {
-                      setPinError('Incorrect 6-digit password. Hint: 153045');
+                      setPinError('Incorrect password. Please try again.');
+                      setPinInput('');
                     }
                   }
                 }}
@@ -297,8 +338,8 @@ export const AdminDashboard: React.FC = () => {
               />
 
               {pinError && (
-                <div className="p-2 bg-red-950/60 border border-red-800 text-red-300 text-xs flex items-center justify-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+                <div className="p-2 bg-red-950/60 border border-red-800 text-red-300 text-xs flex items-center justify-center gap-1.5 animate-in fade-in">
+                  <AlertTriangle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
                   <span>{pinError}</span>
                 </div>
               )}
@@ -309,6 +350,7 @@ export const AdminDashboard: React.FC = () => {
                   <button
                     key={btn}
                     type="button"
+                    disabled={isLoggingIn}
                     onClick={() => {
                       if (btn === 'C') {
                         setPinInput('');
@@ -319,33 +361,33 @@ export const AdminDashboard: React.FC = () => {
                         handleDigitClick(btn);
                       }
                     }}
-                    className="py-3 bg-[#1F1F24] hover:bg-[#2A2A32] active:bg-[#D4AF37] active:text-[#121214] border border-[#2E2E36] text-sm font-semibold text-[#FAF8F5] transition-colors"
+                    className="py-3 bg-[#1F1F24] hover:bg-[#2A2A32] active:bg-[#D4AF37] active:text-[#121214] border border-[#2E2E36] text-sm font-semibold text-[#FAF8F5] transition-colors disabled:opacity-50"
                   >
                     {btn}
                   </button>
                 ))}
               </div>
 
-              {/* Submit & Hint */}
+              {/* Submit Button */}
               <button
                 type="submit"
-                className="w-full py-3 bg-[#D4AF37] hover:bg-[#E6CA65] text-[#121214] text-xs font-bold uppercase tracking-[0.2em] transition-all shadow-md mt-2 flex items-center justify-center gap-2"
+                disabled={isLoggingIn || pinInput.length === 0}
+                className="w-full py-3 bg-[#D4AF37] hover:bg-[#E6CA65] text-[#121214] text-xs font-bold uppercase tracking-[0.2em] transition-all shadow-md mt-2 flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                <KeyRound className="w-4 h-4" />
-                <span>Unlock Admin Section</span>
+                {isLoggingIn ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Verifying...</span>
+                  </>
+                ) : (
+                  <>
+                    <KeyRound className="w-4 h-4" />
+                    <span>Unlock Admin Section</span>
+                  </>
+                )}
               </button>
 
-              <div className="pt-2 flex items-center justify-between text-[11px] text-[#8E8B85]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPinInput('153045');
-                    loginAdmin('153045');
-                  }}
-                  className="text-[#D4AF37] hover:underline"
-                >
-                  Quick Fill: 153045
-                </button>
+              <div className="pt-2 flex items-center justify-center text-[11px] text-[#8E8B85]">
                 <button
                   type="button"
                   onClick={() => setIsAdminOpen(false)}
@@ -380,7 +422,7 @@ export const AdminDashboard: React.FC = () => {
               <div className="flex items-center gap-3">
                 <button
                   onClick={logoutAdmin}
-                  className="text-xs text-[#8E8B85] hover:text-red-400 flex items-center gap-1 border border-[#2C2C32] px-2.5 py-1"
+                  className="text-xs text-[#8E8B85] hover:text-red-400 flex items-center gap-1 border border-[#2C2C32] px-2.5 py-1 transition-colors"
                   title="Logout Admin"
                 >
                   <LogOut className="w-3 h-3" />
@@ -579,33 +621,66 @@ export const AdminDashboard: React.FC = () => {
                         <p className="text-xs text-[#8E8B85]">Change images, add multiple photos, update pricing and weights, add/remove pieces.</p>
                       </div>
 
-                      <button
-                        onClick={() => {
-                          setIsAddingProduct(true);
-                          setEditingProduct(null);
-                          setProductForm({
-                            name: '',
-                            category: 'jewellery',
-                            subcategory: 'necklaces',
-                            price: 3500,
-                            originalPrice: 4500,
-                            discountPercentage: 22,
-                            weight: '120 g',
-                            size: 'Adjustable Cord',
-                            availableSizes: ['Adjustable Cord (Standard 16-18 Inch)'],
-                            material: 'High-Grade Brass Alloy & Cubic Zirconia',
-                            finish: '18K Antique Gold Finish',
-                            stockQuantity: 10,
-                            careInstructions: ['Wipe with soft cloth', 'Keep in velvet box'],
-                            images: [],
-                            sku: `VEL-${Date.now().toString().slice(-4)}`,
-                          });
-                        }}
-                        className="px-4 py-2 bg-[#D4AF37] hover:bg-[#E6CA65] text-[#121214] text-xs font-semibold uppercase tracking-wider flex items-center gap-2"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>Add Product</span>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {confirmResetCatalog ? (
+                          <div className="flex items-center gap-1.5 animate-in fade-in">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setConfirmResetCatalog(false);
+                                await resetToDefaultProducts();
+                                showNotification('Catalog reset to default showroom items');
+                              }}
+                              className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
+                            >
+                              Confirm Reset
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmResetCatalog(false)}
+                              className="px-2.5 py-1.5 bg-[#2A2A32] text-xs text-[#DCD6CB]"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmResetCatalog(true)}
+                            className="px-3 py-2 border border-[#2E2E36] text-xs text-[#8E8B85] hover:text-white"
+                          >
+                            Reset Catalog
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => {
+                            setIsAddingProduct(true);
+                            setEditingProduct(null);
+                            setProductForm({
+                              name: '',
+                              category: 'jewellery',
+                              subcategory: 'necklaces',
+                              price: 3500,
+                              originalPrice: 4500,
+                              discountPercentage: 22,
+                              weight: '120 g',
+                              size: 'Adjustable Cord',
+                              availableSizes: ['Adjustable Cord (Standard 16-18 Inch)'],
+                              material: 'High-Grade Brass Alloy & Cubic Zirconia',
+                              finish: '18K Antique Gold Finish',
+                              stockQuantity: 10,
+                              careInstructions: ['Wipe with soft cloth', 'Keep in velvet box'],
+                              images: [],
+                              sku: `VEL-${Date.now().toString().slice(-4)}`,
+                            });
+                          }}
+                          className="px-4 py-2 bg-[#D4AF37] hover:bg-[#E6CA65] text-[#121214] text-xs font-semibold uppercase tracking-wider flex items-center gap-2"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Add Product</span>
+                        </button>
+                      </div>
                     </div>
 
                     {/* Add / Edit Product Modal Form */}
@@ -749,7 +824,7 @@ export const AdminDashboard: React.FC = () => {
                           </div>
 
                           <div>
-                            <label className="block text-[#DCD6CB] mb-1">Stock Quantity</label>
+                            <label className="block text-[#DCD6CB] mb-1">Stock Pieces Available</label>
                             <input
                               type="number"
                               value={productForm.stockQuantity || 0}
@@ -758,10 +833,43 @@ export const AdminDashboard: React.FC = () => {
                             />
                           </div>
 
+                          <div>
+                            <label className="block text-[#DCD6CB] mb-1">Category</label>
+                            <select
+                              value={productForm.category || 'jewellery'}
+                              onChange={(e) => setProductForm({ ...productForm, category: e.target.value as ProductCategory })}
+                              className="w-full px-3 py-1.5 bg-[#141418] border border-[#2E2E36] text-[#FAF8F5]"
+                            >
+                              <option value="jewellery">Artificial Jewellery</option>
+                              <option value="candles">Decorative Candles</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[#DCD6CB] mb-1">Subcategory</label>
+                            <select
+                              value={productForm.subcategory || 'necklaces'}
+                              onChange={(e) => setProductForm({ ...productForm, subcategory: e.target.value as ProductSubcategory })}
+                              className="w-full px-3 py-1.5 bg-[#141418] border border-[#2E2E36] text-[#FAF8F5]"
+                            >
+                              <option value="necklaces">Necklaces</option>
+                              <option value="chokers">Chokers</option>
+                              <option value="bridal">Bridal Sets</option>
+                              <option value="earrings">Earrings</option>
+                              <option value="rings">Rings</option>
+                              <option value="bracelets">Bracelets</option>
+                              <option value="bangles">Bangles</option>
+                              <option value="decorative_candles">Decorative Candles</option>
+                              <option value="scented_candles">Scented Candles</option>
+                              <option value="gift_candles">Gift Candles</option>
+                              <option value="candle_sets">Candle Sets</option>
+                            </select>
+                          </div>
+
                           <div className="sm:col-span-2">
-                            <label className="block text-[#DCD6CB] mb-1">Description</label>
+                            <label className="block text-[#DCD6CB] mb-1">Product Description</label>
                             <textarea
-                              rows={2}
+                              rows={3}
                               value={productForm.description || ''}
                               onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
                               className="w-full px-3 py-1.5 bg-[#141418] border border-[#2E2E36] text-[#FAF8F5]"
@@ -769,28 +877,29 @@ export const AdminDashboard: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="pt-2 flex justify-end gap-3">
+                        <div className="flex justify-end gap-3 pt-3 border-t border-[#2A2A32]">
                           <button
                             type="button"
                             onClick={() => { setIsAddingProduct(false); setEditingProduct(null); }}
-                            className="px-4 py-2 border border-[#2E2E36] text-xs text-[#FAF8F5]"
+                            className="px-4 py-2 border border-[#2E2E36] text-xs text-[#8E8B85] hover:text-white"
                           >
                             Cancel
                           </button>
                           <button
                             type="submit"
-                            className="px-6 py-2 bg-[#D4AF37] text-[#121214] text-xs font-semibold uppercase tracking-wider"
+                            className="px-6 py-2 bg-[#D4AF37] hover:bg-[#E6CA65] text-[#121214] text-xs font-bold uppercase tracking-wider flex items-center gap-2"
                           >
-                            Save Product
+                            <Save className="w-4 h-4" />
+                            <span>Save Product</span>
                           </button>
                         </div>
                       </form>
                     )}
 
-                    {/* Products Table with Inline Price & Stock Updates */}
-                    <div className="bg-[#1F1F24] border border-[#2E2E36] overflow-x-auto">
-                      <table className="w-full text-left text-xs text-[#FAF8F5]">
-                        <thead className="bg-[#141418] text-[#8E8B85] uppercase tracking-wider border-b border-[#2E2E36]">
+                    {/* Products Table with INSTANT NON-BLOCKING Delete */}
+                    <div className="border border-[#2E2E36] overflow-x-auto bg-[#1F1F24]">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-[#141418] border-b border-[#2E2E36] text-[#8E8B85] uppercase tracking-wider text-[10px]">
                           <tr>
                             <th className="p-3">Product</th>
                             <th className="p-3">Weight</th>
@@ -801,17 +910,17 @@ export const AdminDashboard: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-[#2A2A32]">
                           {products.map(prod => (
-                            <tr key={prod.id} className="hover:bg-[#25252C]">
+                            <tr key={prod.id} className="hover:bg-[#25252C] transition-colors">
                               <td className="p-3 flex items-center gap-3">
                                 <div className="w-12 h-12 bg-[#121214] border border-[#2A2A32] flex-shrink-0 overflow-hidden">
                                   <JewelleryImage product={prod} showBadge={false} />
                                 </div>
                                 <div>
-                                  <p className="font-semibold text-sm">{prod.name}</p>
+                                  <p className="font-semibold text-sm text-[#FAF8F5]">{prod.name}</p>
                                   <span className="text-[10px] text-[#8E8B85]">{prod.sku} · {prod.subcategory}</span>
                                 </div>
                               </td>
-                              <td className="p-3 font-mono">{prod.weight}</td>
+                              <td className="p-3 font-mono text-[#DCD6CB]">{prod.weight}</td>
                               <td className="p-3">
                                 <input
                                   type="number"
@@ -824,14 +933,14 @@ export const AdminDashboard: React.FC = () => {
                                 <div className="flex items-center gap-1.5">
                                   <button
                                     onClick={() => updateStock(prod.id, Math.max(0, prod.stockQuantity - 1))}
-                                    className="w-6 h-6 bg-[#141418] border border-[#2E2E36] flex items-center justify-center text-xs"
+                                    className="w-6 h-6 bg-[#141418] border border-[#2E2E36] flex items-center justify-center text-xs hover:border-[#D4AF37]"
                                   >
                                     -
                                   </button>
-                                  <span className="w-8 text-center font-mono font-bold">{prod.stockQuantity}</span>
+                                  <span className="w-8 text-center font-mono font-bold text-xs">{prod.stockQuantity}</span>
                                   <button
                                     onClick={() => updateStock(prod.id, prod.stockQuantity + 1)}
-                                    className="w-6 h-6 bg-[#141418] border border-[#2E2E36] flex items-center justify-center text-xs"
+                                    className="w-6 h-6 bg-[#141418] border border-[#2E2E36] flex items-center justify-center text-xs hover:border-[#D4AF37]"
                                   >
                                     +
                                   </button>
@@ -849,17 +958,40 @@ export const AdminDashboard: React.FC = () => {
                                   >
                                     Edit Photos / Details
                                   </button>
-                                  <button
-                                    onClick={() => {
-                                      if (confirm(`Are you sure you want to remove "${prod.name}" from your catalog?`)) {
-                                        deleteProduct(prod.id);
-                                      }
-                                    }}
-                                    className="p-1 text-[#8E8B85] hover:text-red-400"
-                                    title="Delete product"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
+
+                                  {/* Zero-blocking inline Delete action */}
+                                  {confirmDeleteId === prod.id ? (
+                                    <div className="inline-flex items-center gap-1.5 animate-in fade-in">
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          setConfirmDeleteId(null);
+                                          await deleteProduct(prod.id);
+                                          showNotification(`"${prod.name}" removed from catalog`);
+                                        }}
+                                        className="px-2.5 py-1 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-[11px] font-bold rounded flex items-center gap-1 shadow-md transition-all"
+                                      >
+                                        <Check className="w-3 h-3" />
+                                        <span>Confirm Delete</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setConfirmDeleteId(null)}
+                                        className="px-2 py-1 bg-[#2A2A32] hover:bg-[#3A3A42] text-[#DCD6CB] text-[11px] rounded"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => setConfirmDeleteId(prod.id)}
+                                      className="p-1.5 text-[#8E8B85] hover:text-red-400 hover:bg-red-950/40 rounded transition-colors"
+                                      title="Delete product"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -885,17 +1017,37 @@ export const AdminDashboard: React.FC = () => {
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (confirm('Reset all website texts to original brand copy?')) {
-                              resetSiteContent();
-                            }
-                          }}
-                          className="px-3 py-1.5 border border-[#2E2E36] text-xs text-[#8E8B85] hover:text-white"
-                        >
-                          Reset to Default Texts
-                        </button>
+                        {confirmResetText ? (
+                          <div className="flex items-center gap-1.5 animate-in fade-in">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setConfirmResetText(false);
+                                await resetSiteContent();
+                                showNotification('Website texts reset to defaults');
+                              }}
+                              className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
+                            >
+                              Confirm Reset
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmResetText(false)}
+                              className="px-2.5 py-1.5 bg-[#2A2A32] text-xs text-[#DCD6CB]"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmResetText(true)}
+                            className="px-3 py-1.5 border border-[#2E2E36] text-xs text-[#8E8B85] hover:text-white"
+                          >
+                            Reset to Default Texts
+                          </button>
+                        )}
+
                         <button
                           type="submit"
                           className="px-6 py-2 bg-[#D4AF37] hover:bg-[#E6CA65] text-[#121214] text-xs font-bold uppercase tracking-wider flex items-center gap-2 shadow-lg"
@@ -907,7 +1059,7 @@ export const AdminDashboard: React.FC = () => {
                     </div>
 
                     {textSaveSuccess && (
-                      <div className="p-3 bg-emerald-950 border border-emerald-700 text-emerald-200 text-xs flex items-center gap-2">
+                      <div className="p-3 bg-emerald-950 border border-emerald-700 text-emerald-200 text-xs flex items-center gap-2 animate-in fade-in">
                         <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                         <span>All website texts and slogans have been updated and saved successfully!</span>
                       </div>
@@ -1105,96 +1257,126 @@ export const AdminDashboard: React.FC = () => {
                     </div>
 
                     <div className="space-y-4">
-                      {orders.map(order => (
-                        <div key={order.id} className="bg-[#1F1F24] border border-[#2E2E36] p-5 space-y-4">
-                          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#2A2A32] pb-3">
-                            <div>
-                              <span className="font-mono text-base font-bold text-[#D4AF37]">#{order.id}</span>
-                              <span className="text-xs text-[#8E8B85] ml-3">
-                                {new Date(order.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                              </span>
-                            </div>
+                      {orders.map(order => {
+                        const rawPhone = (order.whatsappNumber || order.phone).replace(/[^0-9]/g, '');
+                        const msg = `Hello ${order.customerName}, this is Vellura Creations regarding your Order #${order.id} for ₹${order.total.toLocaleString('en-IN')}.`;
+                        const waUrl = `https://wa.me/${rawPhone}?text=${encodeURIComponent(msg)}`;
 
-                            <div className="flex items-center gap-2">
-                              <label className="text-xs text-[#8E8B85]">Status:</label>
-                              <select
-                                value={order.status}
-                                onChange={(e) => updateOrderStatus(order.id, e.target.value as OrderStatus)}
-                                className="bg-[#141418] border border-[#3E3E48] text-xs text-[#FAF8F5] py-1 px-2.5 focus:outline-none"
-                              >
-                                <option value="New">New</option>
-                                <option value="Confirmed">Confirmed</option>
-                                <option value="Processing">Processing</option>
-                                <option value="Ready to Ship">Ready to Ship</option>
-                                <option value="Shipped">Shipped</option>
-                                <option value="Delivered">Delivered</option>
-                                <option value="Cancelled">Cancelled</option>
-                              </select>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-[#DCD6CB]">
-                            <div>
-                              <p className="text-[#8E8B85] uppercase tracking-wider text-[10px]">Customer</p>
-                              <p className="font-semibold text-sm text-[#FAF8F5]">{order.customerName}</p>
-                              <p>Phone: {order.phone}</p>
-                              <p>WhatsApp: {order.whatsappNumber}</p>
-                              {order.email && <p>Email: {order.email}</p>}
-                            </div>
-
-                            <div>
-                              <p className="text-[#8E8B85] uppercase tracking-wider text-[10px]">Delivery Address</p>
-                              <p>{order.address}, {order.city}, {order.state} - {order.pincode}</p>
-                              {order.landmark && <p className="text-[#8E8B85]">Landmark: {order.landmark}</p>}
-                              {order.notes && <p className="text-amber-300 mt-1">Note: {order.notes}</p>}
-                            </div>
-                          </div>
-
-                          <div className="bg-[#141418] p-3 text-xs divide-y divide-[#222228]">
-                            {order.items.map(item => (
-                              <div key={item.id} className="py-1.5 flex justify-between">
-                                <span>
-                                  {item.product.name} × {item.quantity}
-                                  {item.selectedVariant ? ` (${item.selectedVariant})` : ''}
-                                </span>
-                                <span className="font-mono tabular-nums text-[#D4AF37]">
-                                  ₹{(item.product.price * item.quantity).toLocaleString('en-IN')}
+                        return (
+                          <div key={order.id} className="bg-[#1F1F24] border border-[#2E2E36] p-5 space-y-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#2A2A32] pb-3">
+                              <div>
+                                <span className="font-mono text-base font-bold text-[#D4AF37]">#{order.id}</span>
+                                <span className="text-xs text-[#8E8B85] ml-3">
+                                  {new Date(order.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                                 </span>
                               </div>
-                            ))}
-                          </div>
 
-                          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                            <div className="font-serif text-sm">
-                              <span>Total: </span>
-                              <strong className="text-base text-[#D4AF37] font-mono tabular-nums">
-                                ₹{order.total.toLocaleString('en-IN')}
-                              </strong>
-                              <span className="text-[10px] text-[#8E8B85] ml-2">(Cash on Delivery)</span>
+                              <div className="flex items-center gap-2">
+                                <label className="text-xs text-[#8E8B85]">Status:</label>
+                                <select
+                                  value={order.status}
+                                  onChange={(e) => updateOrderStatus(order.id, e.target.value as OrderStatus)}
+                                  className="bg-[#141418] border border-[#3E3E48] text-xs text-[#FAF8F5] py-1 px-2.5 focus:outline-none"
+                                >
+                                  <option value="New">New</option>
+                                  <option value="Confirmed">Confirmed</option>
+                                  <option value="Processing">Processing</option>
+                                  <option value="Ready to Ship">Ready to Ship</option>
+                                  <option value="Shipped">Shipped</option>
+                                  <option value="Delivered">Delivered</option>
+                                  <option value="Cancelled">Cancelled</option>
+                                </select>
+                              </div>
                             </div>
 
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => openCustomerWhatsApp(order)}
-                                className="px-3 py-1.5 bg-[#25D366]/20 border border-[#25D366]/50 text-[#25D366] text-xs font-medium hover:bg-[#25D366] hover:text-[#121214] flex items-center gap-1.5 transition-colors"
-                              >
-                                <MessageCircle className="w-3.5 h-3.5" />
-                                <span>WhatsApp Customer</span>
-                              </button>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-[#DCD6CB]">
+                              <div>
+                                <p className="text-[#8E8B85] uppercase tracking-wider text-[10px]">Customer</p>
+                                <p className="font-semibold text-sm text-[#FAF8F5]">{order.customerName}</p>
+                                <p>Phone: {order.phone}</p>
+                                <p>WhatsApp: {order.whatsappNumber}</p>
+                                {order.email && <p>Email: {order.email}</p>}
+                              </div>
 
-                              <button
-                                onClick={() => {
-                                  if (confirm('Delete this order record?')) deleteOrder(order.id);
-                                }}
-                                className="p-1.5 text-[#8E8B85] hover:text-red-400"
-                                title="Delete Order"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              <div>
+                                <p className="text-[#8E8B85] uppercase tracking-wider text-[10px]">Delivery Address</p>
+                                <p>{order.address}, {order.city}, {order.state} - {order.pincode}</p>
+                                {order.landmark && <p className="text-[#8E8B85]">Landmark: {order.landmark}</p>}
+                                {order.notes && <p className="text-amber-300 mt-1">Note: {order.notes}</p>}
+                              </div>
+                            </div>
+
+                            <div className="bg-[#141418] p-3 text-xs divide-y divide-[#222228]">
+                              {order.items.map(item => (
+                                <div key={item.id} className="py-1.5 flex justify-between">
+                                  <span>
+                                    {item.product.name} × {item.quantity}
+                                    {item.selectedVariant ? ` (${item.selectedVariant})` : ''}
+                                  </span>
+                                  <span className="font-mono tabular-nums text-[#D4AF37]">
+                                    ₹{(item.product.price * item.quantity).toLocaleString('en-IN')}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                              <div className="font-serif text-sm">
+                                <span>Total: </span>
+                                <strong className="text-base text-[#D4AF37] font-mono tabular-nums">
+                                  ₹{order.total.toLocaleString('en-IN')}
+                                </strong>
+                                <span className="text-[10px] text-[#8E8B85] ml-2">(Cash on Delivery)</span>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <a
+                                  href={waUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1.5 bg-[#25D366]/20 border border-[#25D366]/50 text-[#25D366] text-xs font-medium hover:bg-[#25D366] hover:text-[#121214] flex items-center gap-1.5 transition-colors"
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5" />
+                                  <span>WhatsApp Customer</span>
+                                </a>
+
+                                {confirmDeleteOrderId === order.id ? (
+                                  <div className="flex items-center gap-1.5 animate-in fade-in">
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        setConfirmDeleteOrderId(null);
+                                        await deleteOrder(order.id);
+                                        showNotification(`Order #${order.id} deleted`);
+                                      }}
+                                      className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold rounded"
+                                    >
+                                      Confirm
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setConfirmDeleteOrderId(null)}
+                                      className="px-2 py-1 bg-[#2A2A32] text-[#DCD6CB] text-[11px] rounded"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmDeleteOrderId(order.id)}
+                                    className="p-1.5 text-[#8E8B85] hover:text-red-400"
+                                    title="Delete Order"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1371,7 +1553,7 @@ export const AdminDashboard: React.FC = () => {
                       </div>
 
                       <p className="text-emerald-400 text-xs">
-                        ✓ All changes are automatically persisted to local showroom storage.
+                        ✓ All changes are synced and securely stored in Vellura showroom database.
                       </p>
                     </div>
                   </div>

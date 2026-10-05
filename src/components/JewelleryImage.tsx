@@ -72,14 +72,14 @@ export const JewelleryImage: React.FC<JewelleryImageProps> = ({
 
       {/* PDF Reference Pill or Tag */}
       {showBadge && product.pdfReferencePage && (
-        <div className="absolute top-3 left-3 bg-[#121214]/85 backdrop-blur-md border border-[#D4AF37]/40 px-2.5 py-1 text-[10px] uppercase tracking-wider text-[#E6CA65] font-semibold shadow-sm">
+        <div className="absolute top-2 left-2 bg-[#121214]/85 backdrop-blur-md border border-[#D4AF37]/40 px-2 py-0.5 text-[9px] sm:text-[10px] uppercase tracking-wider text-[#E6CA65] font-semibold shadow-sm z-10">
           Catalog Pg {product.pdfReferencePage}
         </div>
       )}
 
       {/* Discount Pill if on sale */}
       {showBadge && product.discountPercentage > 0 && (
-        <div className="absolute top-3 right-3 bg-[#6B1D2F] border border-[#801B31] px-2.5 py-1 text-[10px] font-bold text-white uppercase tracking-wider shadow-sm">
+        <div className="absolute bottom-2 left-2 bg-[#6B1D2F] border border-[#801B31] px-2 py-0.5 text-[9px] sm:text-[10px] font-bold text-white uppercase tracking-wider shadow-sm z-10">
           {product.discountPercentage}% OFF
         </div>
       )}

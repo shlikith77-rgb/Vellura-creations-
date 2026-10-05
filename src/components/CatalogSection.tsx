@@ -1,5 +1,5 @@
 import React from 'react';
-import { Filter, Search, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { Search, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { useShop } from '../context/ShopContext';
 import { ProductCard } from './ProductCard';
 import { ProductCategory, ProductSubcategory } from '../types';
@@ -33,31 +33,31 @@ export const CatalogSection: React.FC = () => {
   };
 
   return (
-    <section id="catalog" className="py-16 md:py-24 bg-[#FAF8F5]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="catalog" className="py-12 md:py-20 bg-[#FAF8F5]">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         
         {/* Section Heading */}
-        <div className="text-center max-w-2xl mx-auto mb-12 space-y-3">
-          <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-[#C5A059] font-medium">
+        <div className="text-center max-w-2xl mx-auto mb-8 sm:mb-12 space-y-2 sm:space-y-3">
+          <div className="inline-flex items-center gap-2 text-[11px] sm:text-xs uppercase tracking-[0.25em] text-[#C5A059] font-medium">
             <Sparkles className="w-3.5 h-3.5" />
             <span>The Signature Showcase</span>
           </div>
 
-          <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-normal text-[#1A1A1A] tracking-tight">
+          <h2 className="font-serif text-2xl sm:text-4xl md:text-5xl font-normal text-[#1A1A1A] tracking-tight">
             {siteContent.catalogTitle}
           </h2>
 
-          <p className="text-sm sm:text-base text-[#706E6B] font-light leading-relaxed">
+          <p className="text-xs sm:text-base text-[#706E6B] font-light leading-relaxed">
             {siteContent.catalogSubtitle}
           </p>
         </div>
 
         {/* Filter & Search Bar */}
-        <div className="bg-white border border-[#EAE6DF] p-4 sm:p-5 mb-8 shadow-sm">
-          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+        <div className="bg-white border border-[#EAE6DF] p-3 sm:p-5 mb-6 sm:mb-8 shadow-xs">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 sm:gap-4">
             
-            {/* Filter Buttons (Interactive filter controls allowed as buttons) */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-2 lg:pb-0 scrollbar-none">
+            {/* Filter Buttons */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 lg:pb-0 scrollbar-none">
               {subcategories.map(item => {
                 const isActive = (selectedCategory === item.cat || (item.cat === 'all' && selectedCategory === 'all')) && 
                                  selectedSubcategory === item.sub;
@@ -65,9 +65,9 @@ export const CatalogSection: React.FC = () => {
                   <button
                     key={item.label}
                     onClick={() => handleSubSelect(item.cat, item.sub)}
-                    className={`px-3.5 py-1.5 text-xs uppercase tracking-wider font-medium whitespace-nowrap transition-colors border ${
+                    className={`px-3 py-1.5 text-[11px] sm:text-xs uppercase tracking-wider font-medium whitespace-nowrap transition-colors border ${
                       isActive
-                        ? 'bg-[#121214] text-[#FAF8F5] border-[#121214] shadow-sm'
+                        ? 'bg-[#121214] text-[#FAF8F5] border-[#121214] shadow-xs'
                         : 'bg-[#FAF8F5] text-[#706E6B] border-[#EAE6DF] hover:border-[#121214] hover:text-[#121214]'
                     }`}
                   >
@@ -78,16 +78,16 @@ export const CatalogSection: React.FC = () => {
             </div>
 
             {/* Search Input & Sort Dropdown */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               {/* Search Bar */}
               <div className="relative flex-1 sm:w-60">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#8E8B85]" />
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#8E8B85]" />
                 <input
                   type="text"
                   placeholder="Search stones, sets..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 bg-[#FAF8F5] border border-[#EAE6DF] text-xs text-[#1A1A1A] placeholder-[#8E8B85] focus:outline-none focus:border-[#121214]"
+                  className="w-full pl-8 pr-3 py-1.5 bg-[#FAF8F5] border border-[#EAE6DF] text-xs text-[#1A1A1A] placeholder-[#8E8B85] focus:outline-none focus:border-[#121214]"
                 />
                 {searchQuery && (
                   <button
@@ -100,13 +100,13 @@ export const CatalogSection: React.FC = () => {
               </div>
 
               {/* Sort Selector */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <SlidersHorizontal className="w-3.5 h-3.5 text-[#706E6B] hidden sm:block" />
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
                   aria-label="Sort products by"
-                  className="bg-[#FAF8F5] border border-[#EAE6DF] text-xs text-[#1A1A1A] py-1.5 px-2.5 focus:outline-none focus:border-[#121214]"
+                  className="bg-[#FAF8F5] border border-[#EAE6DF] text-xs text-[#1A1A1A] py-1.5 px-2 sm:px-2.5 focus:outline-none focus:border-[#121214]"
                 >
                   <option value="featured">Featured First</option>
                   <option value="bestselling">Customer Bestsellers</option>
@@ -121,7 +121,7 @@ export const CatalogSection: React.FC = () => {
           </div>
 
           {/* Active Filter State Kicker */}
-          <div className="mt-3 pt-3 border-t border-[#F2EFE9] flex items-center justify-between text-xs text-[#706E6B]">
+          <div className="mt-2.5 pt-2.5 border-t border-[#F2EFE9] flex items-center justify-between text-xs text-[#706E6B]">
             <span>
               Showing <strong className="font-mono tabular-nums text-[#1A1A1A]">{filteredProducts.length}</strong> creations
               {searchQuery && <span> matching "<strong className="text-[#1A1A1A]">{searchQuery}</strong>"</span>}
@@ -134,7 +134,7 @@ export const CatalogSection: React.FC = () => {
                   setSelectedSubcategory('all');
                   setSearchQuery('');
                 }}
-                className="text-xs text-[#6B1D2F] hover:underline"
+                className="text-xs text-[#6B1D2F] hover:underline font-medium"
               >
                 Reset Filters
               </button>
@@ -142,9 +142,9 @@ export const CatalogSection: React.FC = () => {
           </div>
         </div>
 
-        {/* Product Grid (Responsive: 1-col on small mobile, 2-col on tablet, 3-col on desktop, 4-col on wide) */}
+        {/* Product Grid: Exactly 2 products side-by-side in every row on mobile */}
         {filteredProducts.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-6">
             {filteredProducts.map(product => (
               <ProductCard key={product.id} product={product} />
             ))}
