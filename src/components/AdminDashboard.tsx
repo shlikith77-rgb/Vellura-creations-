@@ -135,35 +135,32 @@ export const AdminDashboard: React.FC = () => {
       setPinError('');
       setPinInput('');
     } else {
-      setPinError('Incorrect password. Please try again.');
+      setPinError('Incorrect password. Access denied.');
       setPinInput('');
     }
   };
 
-  const handleDigitClick = async (digit: string) => {
-    if (isLoggingIn || pinInput.length >= 6) return;
-    const nextPin = pinInput + digit;
-    setPinInput(nextPin);
+  const handleDigitClick = (digit: string) => {
+    if (isLoggingIn) return;
+    setPinInput(prev => prev + digit);
     setPinError('');
-
-    if (nextPin.length === 6) {
-      setIsLoggingIn(true);
-      const result = await loginAdmin(nextPin);
-      setIsLoggingIn(false);
-
-      if (result.success) {
-        setPinError('');
-        setPinInput('');
-      } else {
-        setPinError('Incorrect password. Please try again.');
-        setPinInput('');
-      }
-    }
   };
 
   const handleBackspace = () => {
     setPinInput(prev => prev.slice(0, -1));
     setPinError('');
+  };
+
+  const handleClose = () => {
+    setIsAdminOpen(false);
+    if (window.location.pathname.toLowerCase() === '/admin' || window.location.pathname.toLowerCase() === '/admin/' || window.location.hash.toLowerCase() === '#admin') {
+      window.history.pushState(null, '', '/');
+    }
+  };
+
+  const handleLogout = async () => {
+    await logoutAdmin();
+    handleClose();
   };
 
   // Stats
@@ -286,66 +283,35 @@ export const AdminDashboard: React.FC = () => {
               Vellura Admin Console
             </h3>
             <p className="text-xs text-[#8E8B85] mb-6">
-              Enter the 6-digit showroom passkey to edit products, prices, images, and website texts.
+              Enter the authorized showroom admin password to access store management controls.
             </p>
 
             <form onSubmit={handlePinSubmit} className="w-full space-y-4">
-              {/* PIN Circles Display */}
-              <div className="flex justify-center gap-2 mb-2">
-                {[0, 1, 2, 3, 4, 5].map((index) => {
-                  const digit = pinInput[index];
-                  return (
-                    <div 
-                      key={index}
-                      className={`w-11 h-12 border-2 flex items-center justify-center text-xl font-mono font-bold transition-all ${
-                        digit 
-                          ? 'border-[#D4AF37] bg-[#D4AF37]/15 text-[#FAF8F5]' 
-                          : 'border-[#3E3E48] bg-[#141418] text-[#8E8B85]'
-                      }`}
-                    >
-                      {digit ? '•' : ''}
-                    </div>
-                  );
-                })}
+              {/* Direct Password Input */}
+              <div className="relative">
+                <input
+                  type="password"
+                  value={pinInput}
+                  disabled={isLoggingIn}
+                  onChange={(e) => {
+                    setPinInput(e.target.value);
+                    setPinError('');
+                  }}
+                  placeholder="Enter Admin Password"
+                  autoFocus
+                  className="w-full px-4 py-3 bg-[#141418] border border-[#2E2E36] text-center font-mono text-base tracking-widest text-[#FAF8F5] focus:outline-none focus:border-[#D4AF37] placeholder:text-[#555] placeholder:text-xs placeholder:tracking-normal"
+                />
               </div>
 
-              {/* Direct Keyboard Input */}
-              <input
-                type="password"
-                maxLength={6}
-                value={pinInput}
-                disabled={isLoggingIn}
-                onChange={async (e) => {
-                  const val = e.target.value.replace(/[^0-9]/g, '');
-                  setPinInput(val);
-                  setPinError('');
-                  if (val.length === 6 && !isLoggingIn) {
-                    setIsLoggingIn(true);
-                    const res = await loginAdmin(val);
-                    setIsLoggingIn(false);
-                    if (res.success) {
-                      setPinError('');
-                      setPinInput('');
-                    } else {
-                      setPinError('Incorrect password. Please try again.');
-                      setPinInput('');
-                    }
-                  }
-                }}
-                placeholder="Or type 6-digit PIN"
-                autoFocus
-                className="w-full px-3 py-2 bg-[#141418] border border-[#2E2E36] text-center font-mono text-base tracking-widest text-[#FAF8F5] focus:outline-none focus:border-[#D4AF37]"
-              />
-
               {pinError && (
-                <div className="p-2 bg-red-950/60 border border-red-800 text-red-300 text-xs flex items-center justify-center gap-1.5 animate-in fade-in">
+                <div className="p-2.5 bg-red-950/70 border border-red-800 text-red-300 text-xs flex items-center justify-center gap-1.5 animate-in fade-in">
                   <AlertTriangle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
                   <span>{pinError}</span>
                 </div>
               )}
 
               {/* Quick Numpad for Touch / Mobile Screens */}
-              <div className="grid grid-cols-3 gap-2 pt-2">
+              <div className="grid grid-cols-3 gap-2 pt-1">
                 {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((btn) => (
                   <button
                     key={btn}
@@ -390,7 +356,7 @@ export const AdminDashboard: React.FC = () => {
               <div className="pt-2 flex items-center justify-center text-[11px] text-[#8E8B85]">
                 <button
                   type="button"
-                  onClick={() => setIsAdminOpen(false)}
+                  onClick={handleClose}
                   className="hover:text-white"
                 >
                   Return to Store
@@ -421,7 +387,7 @@ export const AdminDashboard: React.FC = () => {
 
               <div className="flex items-center gap-3">
                 <button
-                  onClick={logoutAdmin}
+                  onClick={handleLogout}
                   className="text-xs text-[#8E8B85] hover:text-red-400 flex items-center gap-1 border border-[#2C2C32] px-2.5 py-1 transition-colors"
                   title="Logout Admin"
                 >
@@ -429,7 +395,7 @@ export const AdminDashboard: React.FC = () => {
                   <span className="hidden sm:inline">Logout</span>
                 </button>
                 <button
-                  onClick={() => setIsAdminOpen(false)}
+                  onClick={handleClose}
                   className="p-1.5 text-[#DCD6CB] hover:text-[#D4AF37] transition-colors"
                 >
                   <X className="w-5 h-5" />

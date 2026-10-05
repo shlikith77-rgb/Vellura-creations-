@@ -30,8 +30,27 @@ const MainContent: React.FC = () => {
     cartCount, 
     cartTotal, 
     setIsCartOpen, 
-    setIsCheckoutOpen 
+    setIsCheckoutOpen,
+    setIsAdminOpen 
   } = useShop();
+
+  // Directly visiting the Admin Panel URL (/admin or #admin) triggers authentication
+  React.useEffect(() => {
+    const checkAdminRoute = () => {
+      const path = window.location.pathname.toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+      if (path === '/admin' || path === '/admin/' || hash === '#admin') {
+        setIsAdminOpen(true);
+      }
+    };
+    checkAdminRoute();
+    window.addEventListener('popstate', checkAdminRoute);
+    window.addEventListener('hashchange', checkAdminRoute);
+    return () => {
+      window.removeEventListener('popstate', checkAdminRoute);
+      window.removeEventListener('hashchange', checkAdminRoute);
+    };
+  }, [setIsAdminOpen]);
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] flex flex-col font-sans selection:bg-[#D4AF37]/20 w-full max-w-full overflow-x-hidden relative">

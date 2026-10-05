@@ -20,7 +20,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = 3000;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '153045';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '1530452026';
 
 // Active admin sessions: token -> { createdAt: number }
 const adminSessions = new Map<string, { createdAt: number }>();
@@ -198,7 +198,7 @@ async function startServer() {
     // Always return clean, uninformative error on failure
     return res.status(401).json({ 
       success: false, 
-      error: 'Incorrect password. Please try again.' 
+      error: 'Incorrect password. Access denied.' 
     });
   });
 

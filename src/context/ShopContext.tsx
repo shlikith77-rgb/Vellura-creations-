@@ -142,12 +142,12 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return { 
         success: false, 
-        error: data.error || 'Incorrect password. Please try again.' 
+        error: data.error || 'Incorrect password. Access denied.' 
       };
     } catch {
       return { 
         success: false, 
-        error: 'Incorrect password. Please try again.' 
+        error: 'Incorrect password. Access denied.' 
       };
     }
   };

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Heart, ShoppingBag, MessageCircle, ShieldCheck, Menu, X } from 'lucide-react';
+import { Search, Heart, ShoppingBag, MessageCircle, Menu, X } from 'lucide-react';
 import { useShop } from '../context/ShopContext';
 
 export const Header: React.FC = () => {
@@ -7,7 +7,6 @@ export const Header: React.FC = () => {
     cartCount, 
     wishlist, 
     setIsCartOpen, 
-    setIsAdminOpen, 
     searchQuery, 
     setSearchQuery, 
     setSelectedCategory,
@@ -186,16 +185,6 @@ export const Header: React.FC = () => {
             <MessageCircle className="w-4 h-4" />
             <span className="whitespace-nowrap">WhatsApp</span>
           </a>
-
-          {/* Admin Dashboard Portal Link */}
-          <button
-            onClick={() => setIsAdminOpen(true)}
-            className="p-2 text-[#8E8B85] hover:text-[#D4AF37] transition-colors border border-transparent hover:border-[#D4AF37]/30"
-            title="Owner Admin Dashboard"
-            aria-label="Admin Portal"
-          >
-            <ShieldCheck className="w-5 h-5" />
-          </button>
         </div>
       </div>
 
@@ -257,12 +246,6 @@ export const Header: React.FC = () => {
               <MessageCircle className="w-4 h-4" />
               Chat on WhatsApp ({storeSettings.whatsappNumber})
             </a>
-            <button
-              onClick={() => { setMobileMenuOpen(false); setIsAdminOpen(true); }}
-              className="w-full py-2 border border-[#D4AF37]/40 text-[#D4AF37] text-xs uppercase tracking-wider hover:bg-[#D4AF37]/10"
-            >
-              Admin Dashboard
-            </button>
           </div>
         </div>
       )}

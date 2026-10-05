@@ -124,11 +124,6 @@ export const Footer: React.FC = () => {
                   Terms & Conditions
                 </button>
               </li>
-              <li>
-                <button onClick={() => setIsAdminOpen(true)} className="hover:text-[#D4AF37] transition-colors text-[#8E8B85]">
-                  Showroom Admin Portal
-                </button>
-              </li>
             </ul>
           </div>
 
@@ -171,7 +166,7 @@ export const Footer: React.FC = () => {
           </div>
         </div>
 
-        {/* Dedicated Admin Section at the very end of the website (Requirement) */}
+        {/* Admin Panel Access at the Very Bottom of the Page */}
         <div className="mt-8 pt-6 border-t border-[#1F1F24] flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#141417] p-4 sm:p-5 border border-[#D4AF37]/30 shadow-inner">
           <div className="flex items-center gap-3 text-center sm:text-left">
             <div className="w-9 h-9 rounded-full bg-[#D4AF37]/15 border border-[#D4AF37]/40 flex items-center justify-center text-[#D4AF37] flex-shrink-0">
@@ -188,7 +183,7 @@ export const Footer: React.FC = () => {
             className="w-full sm:w-auto px-6 py-2.5 bg-[#D4AF37] hover:bg-[#E6CA65] text-[#121214] text-xs font-bold uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-[#D4AF37]/20"
           >
             <ShieldCheck className="w-4 h-4" />
-            <span>Admin Section</span>
+            <span>Admin Panel</span>
           </button>
         </div>
 
