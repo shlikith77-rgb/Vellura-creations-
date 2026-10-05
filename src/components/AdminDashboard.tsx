@@ -26,6 +26,7 @@ import {
   Image as ImageIcon,
   LogOut,
   Eye,
+  EyeOff,
   CheckCircle2,
   Loader2
 } from 'lucide-react';
@@ -64,6 +65,7 @@ export const AdminDashboard: React.FC = () => {
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'texts' | 'orders' | 'inventory' | 'offers' | 'business'>('dashboard');
@@ -122,13 +124,13 @@ export const AdminDashboard: React.FC = () => {
   if (!isAdminOpen) return null;
 
   // Handle Login via backend validation (Strict: zero password hints or leaks)
-  const handlePinSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pinInput.trim() || isLoggingIn) return;
+  const verifyPassword = async (pass: string) => {
+    const clean = pass.trim();
+    if (!clean || isLoggingIn) return;
 
     setIsLoggingIn(true);
     setPinError('');
-    const result = await loginAdmin(pinInput);
+    const result = await loginAdmin(clean);
     setIsLoggingIn(false);
 
     if (result.success) {
@@ -140,10 +142,19 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handlePinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await verifyPassword(pinInput);
+  };
+
   const handleDigitClick = (digit: string) => {
     if (isLoggingIn) return;
-    setPinInput(prev => prev + digit);
+    const nextPin = pinInput + digit;
+    setPinInput(nextPin);
     setPinError('');
+    if (nextPin.length === 10) {
+      verifyPassword(nextPin);
+    }
   };
 
   const handleBackspace = () => {
@@ -290,17 +301,30 @@ export const AdminDashboard: React.FC = () => {
               {/* Direct Password Input */}
               <div className="relative">
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={pinInput}
                   disabled={isLoggingIn}
                   onChange={(e) => {
-                    setPinInput(e.target.value);
+                    const val = e.target.value;
+                    setPinInput(val);
                     setPinError('');
+                    if (val.trim().length === 10) {
+                      verifyPassword(val);
+                    }
                   }}
                   placeholder="Enter Admin Password"
                   autoFocus
-                  className="w-full px-4 py-3 bg-[#141418] border border-[#2E2E36] text-center font-mono text-base tracking-widest text-[#FAF8F5] focus:outline-none focus:border-[#D4AF37] placeholder:text-[#555] placeholder:text-xs placeholder:tracking-normal"
+                  className="w-full px-4 py-3 bg-[#141418] border border-[#2E2E36] text-center font-mono text-base tracking-widest text-[#FAF8F5] focus:outline-none focus:border-[#D4AF37] placeholder:text-[#555] placeholder:text-xs placeholder:tracking-normal pr-11"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8E8B85] hover:text-[#FAF8F5] p-1.5 transition-colors"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
 
               {pinError && (
