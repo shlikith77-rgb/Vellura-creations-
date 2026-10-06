@@ -209,25 +209,27 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // 1. Site Content (Headlines, copy, slogans)
   const [siteContent, setSiteContent] = useState<SiteContent>(initialSiteContent);
 
-  // 2. Products Catalog (persisted locally and synced with backend; filters legacy demo items)
+  // 2. Products Catalog (persisted in IndexedDB + localStorage + Cloudflare static fallback)
+  const isStorageInitializedRef = useRef(false);
+
   const [products, setProducts] = useState<Product[]>(() => {
     try {
       const saved = localStorage.getItem('vellura_products');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          // Filter out legacy demo PDF products to honor user request for clean empty catalog
+        if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.filter((p: any) => !p.id?.startsWith('vel-pdf-'));
         }
       }
-      return [];
-    } catch {
-      return [];
-    }
+    } catch {}
+    return [];
   });
 
   // Dual storage: IndexedDB (unlimited capacity) + localStorage
   useEffect(() => {
+    // CRITICAL: Only write to storage once initialized so empty initial state NEVER wipes out existing data on reload!
+    if (!isStorageInitializedRef.current) return;
+
     try {
       localStorage.setItem('vellura_products', JSON.stringify(products));
     } catch (e) {
@@ -249,33 +251,100 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // 6. Orders
   const [orders, setOrders] = useState<Order[]>([]);
 
-  // Fetch initial public store data from server and IndexedDB
+  // Initial load: 1) IndexedDB (unlimited storage across refreshes), 2) localStorage, 3) /catalog.json (Cloudflare Pages), 4) /api/products
   useEffect(() => {
     let isMounted = true;
 
-    // Load from IndexedDB (preserves unlimited products across browser reloads)
-    loadProductsFromIndexedDb().then((idbProducts) => {
-      if (isMounted && Array.isArray(idbProducts) && idbProducts.length > 0) {
-        setProducts(idbProducts);
-      }
-    });
-
-    // Products
-    fetch('/api/products')
-      .then(res => res.json())
-      .then(data => {
-        if (isMounted && data.success && Array.isArray(data.data) && data.data.length > 0) {
-          // Filter any legacy demo PDF products
-          const cleanProducts = data.data.filter((p: any) => !p.id?.startsWith('vel-pdf-'));
-          setProducts(cleanProducts);
-          try {
-            localStorage.setItem('vellura_products', JSON.stringify(cleanProducts));
-          } catch {}
-          saveProductsToIndexedDb(cleanProducts);
+    async function initializeProducts() {
+      // 1. Try loading from IndexedDB first (holds unlimited items across browser reloads)
+      try {
+        const idbProducts = await loadProductsFromIndexedDb();
+        if (isMounted && Array.isArray(idbProducts) && idbProducts.length > 0) {
+          const clean = idbProducts.filter((p: any) => !p.id?.startsWith('vel-pdf-'));
+          if (clean.length > 0) {
+            setProducts(clean);
+            try {
+              localStorage.setItem('vellura_products', JSON.stringify(clean));
+            } catch {}
+            isStorageInitializedRef.current = true;
+            return;
+          }
         }
-      })
-      .catch(() => {});
+      } catch (err) {
+        console.warn('IndexedDB read notice:', err);
+      }
 
+      // 2. Try localStorage
+      try {
+        const saved = localStorage.getItem('vellura_products');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (isMounted && Array.isArray(parsed) && parsed.length > 0) {
+            const clean = parsed.filter((p: any) => !p.id?.startsWith('vel-pdf-'));
+            if (clean.length > 0) {
+              setProducts(clean);
+              saveProductsToIndexedDb(clean);
+              isStorageInitializedRef.current = true;
+              return;
+            }
+          }
+        }
+      } catch {}
+
+      // 3. Try static /catalog.json (works on static hosts like Cloudflare Pages)
+      try {
+        const catRes = await fetch('/catalog.json');
+        if (catRes.ok) {
+          const catData = await catRes.json();
+          if (isMounted && Array.isArray(catData) && catData.length > 0) {
+            const clean = catData.filter((p: any) => !p.id?.startsWith('vel-pdf-'));
+            if (clean.length > 0) {
+              setProducts(clean);
+              saveProductsToIndexedDb(clean);
+              try {
+                localStorage.setItem('vellura_products', JSON.stringify(clean));
+              } catch {}
+              isStorageInitializedRef.current = true;
+              return;
+            }
+          }
+        }
+      } catch {}
+
+      // 4. Try backend /api/products (works on Node/Docker/Fullstack hosts)
+      try {
+        const apiRes = await fetch('/api/products');
+        if (apiRes.ok) {
+          const apiData = await apiRes.json();
+          if (isMounted && apiData.success && Array.isArray(apiData.data) && apiData.data.length > 0) {
+            const clean = apiData.data.filter((p: any) => !p.id?.startsWith('vel-pdf-'));
+            if (clean.length > 0) {
+              setProducts(clean);
+              saveProductsToIndexedDb(clean);
+              try {
+                localStorage.setItem('vellura_products', JSON.stringify(clean));
+              } catch {}
+              isStorageInitializedRef.current = true;
+              return;
+            }
+          }
+        }
+      } catch {}
+
+      if (isMounted) {
+        isStorageInitializedRef.current = true;
+      }
+    }
+
+    initializeProducts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Fetch initial public store content from server
+  useEffect(() => {
     // Site Content
     fetch('/api/site-content')
       .then(res => res.json())
@@ -542,10 +611,12 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // respond with ZERO delay or lockup, while syncing securely to backend.
   // ========================================================
 
-  // Delete Product (Permanently removes locally and on server without rolling back)
+  // Delete Product (Permanently removes locally and on server)
   const deleteProduct = async (id: string): Promise<boolean> => {
+    isStorageInitializedRef.current = true;
     setProducts(prev => {
       const next = prev.filter(p => p.id !== id);
+      saveProductsToIndexedDb(next);
       try {
         localStorage.setItem('vellura_products', JSON.stringify(next));
       } catch {}
@@ -576,12 +647,17 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       images: newProdData.images && newProdData.images.length > 0 ? newProdData.images : ['https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&q=80&w=900'],
     };
 
-    // Instant update
+    isStorageInitializedRef.current = true;
+
+    // Instant update to React state, IndexedDB, and localStorage
     setProducts(prev => {
       const next = [newProduct, ...prev];
+      saveProductsToIndexedDb(next);
       try {
         localStorage.setItem('vellura_products', JSON.stringify(next));
-      } catch {}
+      } catch (e) {
+        console.warn('localStorage quota reached, IndexedDB keeps all products safely', e);
+      }
       return next;
     });
 
@@ -596,6 +672,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data && data.success && data.data) {
         setProducts(prev => {
           const next = prev.map(p => p.id === tempId ? data.data : p);
+          saveProductsToIndexedDb(next);
           try {
             localStorage.setItem('vellura_products', JSON.stringify(next));
           } catch {}
@@ -610,6 +687,8 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Update Product
   const updateProduct = async (id: string, updates: Partial<Product>): Promise<boolean> => {
+    isStorageInitializedRef.current = true;
+
     setProducts(prev => {
       const next = prev.map(p => {
         if (p.id === id) {
@@ -621,9 +700,12 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         return p;
       });
+      saveProductsToIndexedDb(next);
       try {
         localStorage.setItem('vellura_products', JSON.stringify(next));
-      } catch {}
+      } catch (e) {
+        console.warn('localStorage quota reached, IndexedDB keeps all products safely', e);
+      }
       return next;
     });
 
@@ -642,6 +724,8 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Update Stock
   const updateStock = async (id: string, newStock: number): Promise<boolean> => {
     const safeStock = Math.max(0, newStock);
+    isStorageInitializedRef.current = true;
+
     setProducts(prev => {
       const next = prev.map(p => {
         if (p.id === id) {
@@ -653,6 +737,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         return p;
       });
+      saveProductsToIndexedDb(next);
       try {
         localStorage.setItem('vellura_products', JSON.stringify(next));
       } catch {}
@@ -689,24 +774,26 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Bulk save all products permanently to IndexedDB, localStorage, and server backend
   const saveAllProducts = async (productList?: Product[]): Promise<boolean> => {
-    const listToSave = productList || products;
+    isStorageInitializedRef.current = true;
+    const listToSave = productList !== undefined ? productList : products;
     setProducts(listToSave);
+    await saveProductsToIndexedDb(listToSave);
     try {
       localStorage.setItem('vellura_products', JSON.stringify(listToSave));
-    } catch {}
-    await saveProductsToIndexedDb(listToSave);
+    } catch (e) {
+      console.warn('localStorage quota reached, IndexedDB keeps all products safely', e);
+    }
 
     try {
-      const res = await fetch('/api/admin/products/save-all', {
+      await fetch('/api/admin/products/save-all', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ products: listToSave }),
       });
-      return res.ok;
     } catch (e) {
       console.warn('Network notice on save-all products:', e);
-      return true;
     }
+    return true;
   };
 
   // Site Content

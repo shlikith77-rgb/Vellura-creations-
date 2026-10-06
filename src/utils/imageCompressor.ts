@@ -1,7 +1,6 @@
-// Client-side image compression to allow unlimited products without browser storage quota issues
-export const compressImageFile = (file: File, maxDimension = 1000, quality = 0.82): Promise<string> => {
+// Client-side image compression for fast loading and unlimited products in storage
+export const compressImageFile = (file: File, maxDimension = 800, quality = 0.72): Promise<string> => {
   return new Promise((resolve) => {
-    // If it's not an image, fall back to basic base64
     if (!file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result as string);
@@ -34,7 +33,7 @@ export const compressImageFile = (file: File, maxDimension = 1000, quality = 0.8
           return;
         }
 
-        // Draw and compress to lightweight JPEG
+        // Draw onto clean white canvas and export as lightweight JPEG
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
@@ -44,9 +43,7 @@ export const compressImageFile = (file: File, maxDimension = 1000, quality = 0.8
       img.onerror = () => resolve(dataUrl);
       img.src = dataUrl;
     };
-    reader.onerror = () => {
-      resolve('');
-    };
+    reader.onerror = () => resolve('');
     reader.readAsDataURL(file);
   });
 };

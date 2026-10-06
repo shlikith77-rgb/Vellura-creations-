@@ -28,7 +28,8 @@ import {
   Eye,
   EyeOff,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Download
 } from 'lucide-react';
 import { useShop } from '../context/ShopContext';
 import { Product, OrderStatus, ProductCategory, ProductSubcategory, SiteContent } from '../types';
@@ -220,6 +221,42 @@ export const AdminDashboard: React.FC = () => {
     }));
   };
 
+  const handleExportCatalog = () => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(products, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `vellura-catalog-${new Date().toISOString().slice(0, 10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showNotification(`Exported ${products.length} products to JSON backup!`);
+    } catch {
+      showNotification('Failed to export catalog JSON', 'error');
+    }
+  };
+
+  const handleImportCatalog = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        if (Array.isArray(parsed)) {
+          await saveAllProducts(parsed);
+          showNotification(`Successfully imported ${parsed.length} products!`);
+        } else {
+          showNotification('Invalid JSON: Expected an array of products', 'error');
+        }
+      } catch {
+        showNotification('Failed to parse catalog JSON file', 'error');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!productForm.name || !productForm.price) return;
@@ -229,7 +266,6 @@ export const AdminDashboard: React.FC = () => {
         ...productForm,
         inStock: (productForm.stockQuantity || 0) > 0,
       });
-      await saveAllProducts();
       showNotification(`"${productForm.name}" updated & saved permanently`);
       setEditingProduct(null);
     } else {
@@ -257,7 +293,6 @@ export const AdminDashboard: React.FC = () => {
         images: productForm.images && productForm.images.length > 0 ? productForm.images : ['https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&q=80&w=900'],
         sku: productForm.sku || `VEL-PROD-${Date.now().toString().slice(-4)}`,
       });
-      await saveAllProducts();
       showNotification(`"${productForm.name}" added & saved permanently`);
       setIsAddingProduct(false);
     }
@@ -653,6 +688,31 @@ export const AdminDashboard: React.FC = () => {
                             Reset Catalog
                           </button>
                         )}
+
+                        {/* Cloudflare Pages Backup & Export */}
+                        <button
+                          type="button"
+                          onClick={handleExportCatalog}
+                          className="px-3 py-2 border border-[#2E2E36] hover:border-[#D4AF37]/50 text-xs text-[#DCD6CB] hover:text-[#FAF8F5] flex items-center gap-1.5 transition-colors"
+                          title="Download catalog as JSON backup"
+                        >
+                          <Download className="w-3.5 h-3.5 text-[#D4AF37]" />
+                          <span>Backup (JSON)</span>
+                        </button>
+
+                        <label
+                          className="px-3 py-2 border border-[#2E2E36] hover:border-[#D4AF37]/50 text-xs text-[#DCD6CB] hover:text-[#FAF8F5] flex items-center gap-1.5 cursor-pointer transition-colors"
+                          title="Import catalog from JSON backup"
+                        >
+                          <Upload className="w-3.5 h-3.5 text-[#D4AF37]" />
+                          <span>Import</span>
+                          <input
+                            type="file"
+                            accept=".json,application/json"
+                            onChange={handleImportCatalog}
+                            className="hidden"
+                          />
+                        </label>
 
                         <button
                           type="button"
