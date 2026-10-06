@@ -71,7 +71,7 @@ export const CandleSection: React.FC = () => {
         {/* Candle Product Grid */}
         {candleProducts.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-6">
-            {candleProducts.slice(0, 4).map(product => (
+            {candleProducts.map(product => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>

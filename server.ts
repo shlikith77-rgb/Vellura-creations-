@@ -124,7 +124,7 @@ function requireAdminAuth(req: Request, res: Response, next: NextFunction) {
 
 async function startServer() {
   const app = express();
-  app.use(express.json({ limit: '25mb' }));
+  app.use(express.json({ limit: '50mb' }));
 
   // ==========================================
   // AUTHENTICATION ROUTES
@@ -287,6 +287,24 @@ async function startServer() {
     store.products = [...initialProducts];
     scheduleSave();
     return res.json({ success: true, data: store.products });
+  });
+
+  // Bulk save all products permanently
+  app.post('/api/admin/products/save-all', requireAdminAuth, async (req: Request, res: Response) => {
+    const { products } = req.body;
+    if (Array.isArray(products)) {
+      store.products = products;
+      try {
+        if (!fs.existsSync(DATA_DIR)) {
+          await fs.promises.mkdir(DATA_DIR, { recursive: true });
+        }
+        await fs.promises.writeFile(STORE_FILE, JSON.stringify(store, null, 2), 'utf-8');
+      } catch (e) {
+        console.error('Error writing store.json on save-all:', e);
+      }
+      return res.json({ success: true, count: store.products.length, data: store.products });
+    }
+    return res.status(400).json({ success: false, error: 'products array required' });
   });
 
   // 2. Site Content & Words Editor

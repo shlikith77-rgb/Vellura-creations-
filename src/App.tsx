@@ -10,7 +10,6 @@ import { OffersSection } from './components/OffersSection';
 import { GiftingSection } from './components/GiftingSection';
 import { AboutSection } from './components/AboutSection';
 import { CustomerReviews } from './components/CustomerReviews';
-import { InstagramGallery } from './components/InstagramGallery';
 import { GoogleMapsSection } from './components/GoogleMapsSection';
 import { ContactSection } from './components/ContactSection';
 import { Footer } from './components/Footer';
@@ -68,7 +67,6 @@ const MainContent: React.FC = () => {
         <GiftingSection />
         <AboutSection />
         <CustomerReviews />
-        <InstagramGallery />
         <GoogleMapsSection />
         <ContactSection />
       </main>

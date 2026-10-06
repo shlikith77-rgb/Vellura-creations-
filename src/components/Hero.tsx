@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowRight, Sparkles, Shield, Award } from 'lucide-react';
 import { useShop } from '../context/ShopContext';
+import heroJewelleryImg from '../assets/images/hero_vellura_jewellery_1791132515536.jpg';
 
 export const Hero: React.FC = () => {
   const { setSelectedCategory, setSelectedSubcategory, siteContent } = useShop();
@@ -105,13 +106,16 @@ export const Hero: React.FC = () => {
             {/* Main Visual Container */}
             <div className="relative aspect-[4/5] overflow-hidden bg-[#18181C] shadow-2xl">
               <img
-                src="/src/assets/images/hero_vellura_jewellery_1791132515536.jpg"
+                src={heroJewelleryImg}
                 alt="Vellura Creations Royal Jewellery Campaign"
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover object-center transform hover:scale-105 transition-transform duration-1000 ease-out"
                 onError={(e) => {
-                  // Fallback in case sandbox asset needs fallback
                   const target = e.currentTarget;
+                  if (!target.src.includes('/images/')) {
+                    target.src = '/images/hero_vellura_jewellery_1791132515536.jpg';
+                    return;
+                  }
                   target.style.display = 'none';
                   const fallback = target.nextElementSibling as HTMLElement;
                   if (fallback) fallback.style.display = 'flex';

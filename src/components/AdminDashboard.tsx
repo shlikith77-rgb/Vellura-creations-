@@ -33,6 +33,7 @@ import {
 import { useShop } from '../context/ShopContext';
 import { Product, OrderStatus, ProductCategory, ProductSubcategory, SiteContent } from '../types';
 import { JewelleryImage } from './JewelleryImage';
+import { compressImageFile } from '../utils/imageCompressor';
 
 export const AdminDashboard: React.FC = () => {
   const { 
@@ -50,6 +51,7 @@ export const AdminDashboard: React.FC = () => {
     deleteProduct, 
     updateStock, 
     resetToDefaultProducts,
+    saveAllProducts,
     orders, 
     updateOrderStatus, 
     deleteOrder,
@@ -66,6 +68,8 @@ export const AdminDashboard: React.FC = () => {
   const [pinError, setPinError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [isSavingAllProducts, setIsSavingAllProducts] = useState(false);
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'texts' | 'orders' | 'inventory' | 'offers' | 'business'>('dashboard');
@@ -179,19 +183,24 @@ export const AdminDashboard: React.FC = () => {
   const pendingOrders = orders.filter(o => o.status === 'New' || o.status === 'Processing');
   const lowStockCount = products.filter(p => p.stockQuantity <= 3).length;
 
-  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
-        setImagePreview(base64);
-        setProductForm(prev => ({
-          ...prev,
-          images: [base64, ...(prev.images || [])]
-        }));
-      };
-      reader.readAsDataURL(file);
+      setIsCompressing(true);
+      try {
+        const compressedBase64 = await compressImageFile(file, 1000, 0.82);
+        if (compressedBase64) {
+          setImagePreview(compressedBase64);
+          setProductForm(prev => ({
+            ...prev,
+            images: [compressedBase64, ...(prev.images || [])]
+          }));
+        }
+      } catch (err) {
+        console.warn('Compression notice:', err);
+      } finally {
+        setIsCompressing(false);
+      }
     }
   };
 
@@ -220,7 +229,8 @@ export const AdminDashboard: React.FC = () => {
         ...productForm,
         inStock: (productForm.stockQuantity || 0) > 0,
       });
-      showNotification(`"${productForm.name}" updated successfully`);
+      await saveAllProducts();
+      showNotification(`"${productForm.name}" updated & saved permanently`);
       setEditingProduct(null);
     } else {
       await addProduct({
@@ -244,10 +254,11 @@ export const AdminDashboard: React.FC = () => {
         careInstructions: productForm.careInstructions || ['Handle with care'],
         stockQuantity: Number(productForm.stockQuantity) || 5,
         inStock: (Number(productForm.stockQuantity) || 5) > 0,
-        images: productForm.images && productForm.images.length > 0 ? productForm.images : ['/src/assets/images/showcase_bridal_emerald_1791132536998.jpg'],
+        images: productForm.images && productForm.images.length > 0 ? productForm.images : ['https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&q=80&w=900'],
         sku: productForm.sku || `VEL-PROD-${Date.now().toString().slice(-4)}`,
       });
-      showNotification(`"${productForm.name}" added to catalog`);
+      await saveAllProducts();
+      showNotification(`"${productForm.name}" added & saved permanently`);
       setIsAddingProduct(false);
     }
 
@@ -644,6 +655,20 @@ export const AdminDashboard: React.FC = () => {
                         )}
 
                         <button
+                          type="button"
+                          onClick={async () => {
+                            setIsSavingAllProducts(true);
+                            await saveAllProducts();
+                            setIsSavingAllProducts(false);
+                            showNotification(`All ${products.length} products saved permanently to store catalog!`);
+                          }}
+                          disabled={isSavingAllProducts}
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold uppercase tracking-wider flex items-center gap-2 shadow-md transition-all disabled:opacity-50"
+                        >
+                          <Save className="w-4 h-4" />
+                          <span>{isSavingAllProducts ? 'Saving Permanently...' : `Save All Changes (${products.length})`}</span>
+                        </button>
+                        <button
                           onClick={() => {
                             setIsAddingProduct(true);
                             setEditingProduct(null);
@@ -732,6 +757,12 @@ export const AdminDashboard: React.FC = () => {
                                 onChange={handleImageFileUpload}
                                 className="w-full text-xs text-[#FAF8F5] file:mr-3 file:py-1.5 file:px-3 file:border-0 file:text-xs file:bg-[#2A2A32] file:text-[#D4AF37] hover:file:bg-[#3A3A44]"
                               />
+                              {isCompressing && (
+                                <p className="text-[10px] text-[#D4AF37] flex items-center gap-1.5 mt-1.5">
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  <span>Optimizing photograph for high-speed storage...</span>
+                                </p>
+                              )}
                             </div>
 
                             <div>

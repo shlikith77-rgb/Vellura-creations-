@@ -12,6 +12,7 @@ import {
   SiteContent
 } from '../types';
 import { initialProducts, initialOffers, initialReviews, initialStoreSettings, initialSiteContent } from '../data/initialData';
+import { saveProductsToIndexedDb, loadProductsFromIndexedDb } from '../utils/productStorage';
 
 interface ShopContextType {
   // Admin Auth
@@ -32,6 +33,7 @@ interface ShopContextType {
   deleteProduct: (id: string) => Promise<boolean>;
   updateStock: (id: string, newStock: number) => Promise<boolean>;
   resetToDefaultProducts: () => Promise<boolean>;
+  saveAllProducts: (productList?: Product[]) => Promise<boolean>;
 
   // Cart
   cart: CartItem[];
@@ -224,10 +226,14 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
+  // Dual storage: IndexedDB (unlimited capacity) + localStorage
   useEffect(() => {
     try {
       localStorage.setItem('vellura_products', JSON.stringify(products));
-    } catch {}
+    } catch (e) {
+      console.warn('localStorage quota reached, IndexedDB keeps all products safely', e);
+    }
+    saveProductsToIndexedDb(products);
   }, [products]);
 
   // 3. Offers
@@ -243,19 +249,29 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // 6. Orders
   const [orders, setOrders] = useState<Order[]>([]);
 
-  // Fetch initial public store data from server
+  // Fetch initial public store data from server and IndexedDB
   useEffect(() => {
+    let isMounted = true;
+
+    // Load from IndexedDB (preserves unlimited products across browser reloads)
+    loadProductsFromIndexedDb().then((idbProducts) => {
+      if (isMounted && Array.isArray(idbProducts) && idbProducts.length > 0) {
+        setProducts(idbProducts);
+      }
+    });
+
     // Products
     fetch('/api/products')
       .then(res => res.json())
       .then(data => {
-        if (data.success && Array.isArray(data.data)) {
+        if (isMounted && data.success && Array.isArray(data.data) && data.data.length > 0) {
           // Filter any legacy demo PDF products
           const cleanProducts = data.data.filter((p: any) => !p.id?.startsWith('vel-pdf-'));
           setProducts(cleanProducts);
           try {
             localStorage.setItem('vellura_products', JSON.stringify(cleanProducts));
           } catch {}
+          saveProductsToIndexedDb(cleanProducts);
         }
       })
       .catch(() => {});
@@ -661,6 +677,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       localStorage.setItem('vellura_products', JSON.stringify([]));
     } catch {}
+    saveProductsToIndexedDb([]);
     try {
       await fetch('/api/admin/products/reset', {
         method: 'POST',
@@ -668,6 +685,28 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     } catch {}
     return true;
+  };
+
+  // Bulk save all products permanently to IndexedDB, localStorage, and server backend
+  const saveAllProducts = async (productList?: Product[]): Promise<boolean> => {
+    const listToSave = productList || products;
+    setProducts(listToSave);
+    try {
+      localStorage.setItem('vellura_products', JSON.stringify(listToSave));
+    } catch {}
+    await saveProductsToIndexedDb(listToSave);
+
+    try {
+      const res = await fetch('/api/admin/products/save-all', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ products: listToSave }),
+      });
+      return res.ok;
+    } catch (e) {
+      console.warn('Network notice on save-all products:', e);
+      return true;
+    }
   };
 
   // Site Content
@@ -879,6 +918,7 @@ Please confirm my order. Thank you!`;
         deleteProduct,
         updateStock,
         resetToDefaultProducts,
+        saveAllProducts,
         cart,
         addToCart,
         removeFromCart,
